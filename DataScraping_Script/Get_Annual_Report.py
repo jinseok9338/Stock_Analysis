@@ -23,7 +23,7 @@ def search_urls(code,year,name):  #take code and return url of Annual Report
 	json_pattern = "\/dsaf001\/main\.do\?rcpNo=[0-9]*"
 
 
-	url_list_to_anuual_report = "http://dart.fss.or.kr"+re.findall(json_pattern, string_list_to_string)[0]
+	url_list_to_anuual_report = "http://dart.fss.or.kr"+re.findall(json_pattern, string_list_to_string)[-1]
 
 	return url_list_to_anuual_report  #url of entire Report
 
@@ -46,22 +46,38 @@ def return_financial_report(url): #Return the income Statement and financial sta
 	url = "http://dart.fss.or.kr//report/viewer.do?rcpNo={rcpNo}&dcmNo={dcmNo}&eleId={eleId}&offset={offset}&length={length}&dtd={dtd}".format(rcpNo=c_list[0],dcmNo=c_list[1],eleId=c_list[2],offset=c_list[3],length=c_list[4],dtd=c_list[5])
 
 	return url
-	
-#url = "http://dart.fss.or.kr/dsaf001/main.do?rcpNo=20160330003536"
-#print(return_financial_report(url))
-#url = "http://dart.fss.or.kr//report/viewer.do?rcpNo=20160330004092&dcmNo=5028918&eleId=13&offset=872178&length=89815&dtd=dart3.xsd"
+
 
 def page_to_csv(url):
-	
 	df = pd.read_html(url)
+	response = requests.get(url)
+	soup = bs(response.content.decode('utf-8','replace'),features="html.parser")
+	soup_string = str(soup)
+	unit_of_money_kor = re.findall("\(단위 : ([가-힣]*)원\)",soup_string)[0]
+
+	unit_of_money_dict = {
+						"십":"0",
+						"백":"00",
+						"천":"000",
+						"만":"0000",
+						"십만":"00000",
+						"백만":"000000",
+						"천만":"0000000",
+						"억":"00000000",
+						"십억":"000000000",
+							}
+
+	unit_of_money = unit_of_money_dict.get(unit_of_money_kor,"0")
 	new_df = [table for table in df if len(table.columns) == 4]
 	result = pd.concat(new_df, ignore_index=True)
-	result = pd.DataFrame(result)
+	result = pd.DataFrame(result,dtype=str)
+	for a in range(1,4):
+		result.iloc[:,a] = result.iloc[:,a]+unit_of_money
+
 	return result
 
 
-
-def get_finstate_income_state(code,year): # This is the function for the income statement Do not use the functions above
+def get_finstate_income_state(code,year,name): # This is the function for the income statement Do not use the functions above
 	year = int(year)+1
 	url_list_to_anual_report = search_urls(code,str(year),name)
 	finstate_url = return_financial_report(url_list_to_anual_report)
